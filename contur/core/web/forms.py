@@ -6,6 +6,9 @@ from core.models import CustomUser
 
 
 class LoginForm(forms.Form):
+    """
+    Form for login
+    """
     username = forms.CharField(
         label='Имя пользователя',
         max_length=150,
@@ -29,6 +32,9 @@ class LoginForm(forms.Form):
 
 
 class RegisterForm(forms.Form):
+    """
+    Form for register
+    """
     username = forms.CharField(
         label='Имя пользователя',
         max_length=150,
@@ -56,12 +62,22 @@ class RegisterForm(forms.Form):
     )
 
     def clean_username(self):
+        """
+        Cleans the username
+        Returns:
+            The cleaned username
+        """
         username = CustomUser.normalize_username(self.cleaned_data['username'])
         if CustomUser.get_by_username(username):
             raise ValidationError('Пользователь с таким именем уже существует.')
         return username
 
     def clean(self):
+        """
+        Cleans the data
+        Returns:
+            The cleaned data
+        """
         cleaned_data = super().clean()
         password1 = cleaned_data.get('password1')
         password2 = cleaned_data.get('password2')
@@ -78,6 +94,11 @@ class RegisterForm(forms.Form):
         return cleaned_data
 
     def save(self):
+        """
+        Saves the user
+        Returns:
+            The created user
+        """
         return CustomUser.objects.create_user(
             username=self.cleaned_data['username'],
             password=self.cleaned_data['password1'],

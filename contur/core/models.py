@@ -16,12 +16,26 @@ if DATA_KEY is None:
     raise ImproperlyConfigured("Encryption key not found.")
 
 def encrypt_value(value):
+    """
+    Encrypts a value using the globaly defined DATA_KEY
+    Args:
+        value: The value to encrypt
+    Returns:
+        The encrypted value
+    """
     cipher_suite = Fernet(DATA_KEY.encode())  # Using globaly variable DATA_KEY
     if value is None or not isinstance(value, str):
         return None
     return cipher_suite.encrypt(value.encode()).decode()
 
 def decrypt_value(value):
+    """
+    Decrypts a value using the globaly defined DATA_KEY
+    Args:
+        value: The value to decrypt
+    Returns:
+        The decrypted value
+    """
     cipher_suite = Fernet(DATA_KEY.encode())  # Similarly for decryption
     if value is None or not isinstance(value, str):
         return None
@@ -64,6 +78,10 @@ class CustomUser(AbstractUser):
     deleted = models.BooleanField(null=False, default=False)
 
     def save(self, *args, **kwargs):
+        """
+        Saves the user to the database
+        Encrypts the username, email, first name and last name
+        """
         if self.username:
             self.username = encrypt_value(self.normalize_username(self.username))
         self.email = encrypt_value(self.email)
@@ -74,6 +92,9 @@ class CustomUser(AbstractUser):
 
     @classmethod
     def decrypted_objects(cls):
+        """
+        Returns a list of decrypted parameters of the user
+        """
         queryset = cls.objects.all()
         decrypted_data = []
         for obj in queryset:
@@ -98,10 +119,24 @@ class CustomUser(AbstractUser):
 
     @staticmethod
     def normalize_username(username):
+        """
+        Normalizes the username
+        Args:
+            username: The username to normalize
+        Returns:
+            The normalized username (lowercase and stripped)
+        """
         return username.strip().lower()
 
     @classmethod
     def get_by_username(cls, username):
+        """
+        Gets a user by decrypted username
+        Args:
+            username: The username to get the user by
+        Returns:
+            The user if found, otherwise None
+        """
         username = cls.normalize_username(username)
         for user in cls.objects.filter(deleted=False):
             if decrypt_value(user.username) == username:
@@ -109,4 +144,9 @@ class CustomUser(AbstractUser):
         return None
 
     def get_decrypted_username(self):
+        """
+        Gets the decrypted username
+        Returns:
+            The decrypted username
+        """
         return decrypt_value(self.username)

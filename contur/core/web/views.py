@@ -8,6 +8,9 @@ from core.web.forms import LoginForm, RegisterForm
 
 
 def welcome(request):
+    """
+    The redirect to the home page if the user is authenticated, otherwise the welcome page
+    """
     if request.user.is_authenticated:
         return redirect('web:home')
     return render(request, 'welcome.html')
@@ -15,12 +18,18 @@ def welcome(request):
 
 @login_required
 def home(request):
+    """
+    Renders the home page
+    """
     return render(request, 'home.html', {
         'username': request.user.get_decrypted_username(),
     })
 
 
 def login_view(request):
+    """
+    Renders the login page
+    """
     if request.user.is_authenticated:
         return redirect('web:home')
 
@@ -48,6 +57,9 @@ def login_view(request):
 
 
 def register_view(request):
+    """
+    Renders the register page
+    """
     if request.user.is_authenticated:
         return redirect('web:home')
 
@@ -63,15 +75,24 @@ def register_view(request):
 
 @login_required
 def settings_view(request):
+    """
+    Renders the settings page
+    """
     return render(request, 'settings.html', {
         'username': request.user.get_decrypted_username(),
     })
 
 
 def logout_view(request):
+    """
+    Logs out the user and redirects to the welcome page
+    """
     logout(request)
     return redirect('web:welcome')
 
 
 def password_reset_view(request):
+    """
+    Renders the password reset page
+    """
     return render(request, 'password_reset.html')
