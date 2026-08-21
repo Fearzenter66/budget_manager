@@ -64,7 +64,8 @@ class CustomUser(AbstractUser):
     deleted = models.BooleanField(null=False, default=False)
 
     def save(self, *args, **kwargs):
-        self.username = encrypt_value(self.username)
+        if self.username:
+            self.username = encrypt_value(self.normalize_username(self.username))
         self.email = encrypt_value(self.email)
         self.first_name = encrypt_value(self.first_name)
         self.last_name = encrypt_value(self.last_name)
@@ -94,3 +95,18 @@ class CustomUser(AbstractUser):
             }
             decrypted_data.append(data)
         return decrypted_data
+
+    @staticmethod
+    def normalize_username(username):
+        return username.strip().lower()
+
+    @classmethod
+    def get_by_username(cls, username):
+        username = cls.normalize_username(username)
+        for user in cls.objects.filter(deleted=False):
+            if decrypt_value(user.username) == username:
+                return user
+        return None
+
+    def get_decrypted_username(self):
+        return decrypt_value(self.username)

@@ -31,6 +31,15 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+AUTH_USER_MODEL = 'core.CustomUser'
+
+AUTHENTICATION_BACKENDS = [
+    'core.auth_backend.EncryptedUsernameBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+LOGIN_URL = 'web:login'
+
 
 # Application definition
 

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Вход — Контур{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="card">
+        <h1 class="logo">Вход</h1>
+        <p class="subtitle">Войдите в аккаунт, чтобы управлять бюджетом.</p>
+
+        <form method="post" class="form">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="form-errors">
+                    {% for error in form.non_field_errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                    {% if show_password_recovery %}
+                        <a href="{% url 'web:password_reset' %}" class="recovery-link">Восстановить пароль</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <div class="form-group">
+                <label class="form-label" for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+                {{ form.username }}
+                {% for error in form.username.errors %}
+                    <p class="form-error">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+                {{ form.password }}
+                {% for error in form.password.errors %}
+                    <p class="form-error">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Войти</button>
+        </form>
+
+        <p class="card-footer">
+            Нет аккаунта? <a href="{% url 'web:register' %}">Зарегистрироваться</a>
+        </p>
+        <a href="{% url 'web:welcome' %}" class="back-link">← На главную</a>
+    </div>
+</div>
+{% endblock %}

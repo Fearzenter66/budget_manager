@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Контур — управление бюджетом{% endblock %}
+
+{% block content %}
+<div class="page">
+    <div class="card">
+        <h1 class="logo">Кон<span>тур</span></h1>
+        <p class="subtitle">
+            Приложение для управления личным и семейным бюджетом.
+            Учитывайте доходы, расходы и держите финансы под контролем.
+        </p>
+        <div class="actions">
+            <a href="{% url 'web:login' %}" class="btn btn-primary">Войти</a>
+            <a href="{% url 'web:register' %}" class="btn btn-secondary">Зарегистрироваться</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
