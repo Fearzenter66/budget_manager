@@ -1,0 +1,40 @@
+<script>
+    (function () {
+        const sourceInput = document.getElementById('id_source');
+        const sourceNameInput = document.getElementById('id_source_name');
+        const sourcePicker = document.getElementById('source-picker');
+        const sourceAddBtn = document.getElementById('source-add');
+        const sourceNewWrap = document.getElementById('source-new-wrap');
+
+        function clearActive() {
+            sourcePicker.querySelectorAll('.picker-tag.active').forEach((tag) => {
+                tag.classList.remove('active');
+            });
+        }
+
+        sourcePicker.querySelectorAll('[data-picker="source"]').forEach((tag) => {
+            if (tag.dataset.value === sourceInput.value) {
+                tag.classList.add('active');
+            }
+
+            tag.addEventListener('click', () => {
+                clearActive();
+                tag.classList.add('active');
+                sourceInput.value = tag.dataset.value;
+                sourceNameInput.value = '';
+                sourceNewWrap.classList.add('hidden');
+            });
+        });
+
+        sourceAddBtn.addEventListener('click', () => {
+            clearActive();
+            sourceInput.value = '';
+            sourceNewWrap.classList.remove('hidden');
+            sourceNameInput.focus();
+        });
+
+        if (sourceNameInput.value) {
+            sourceNewWrap.classList.remove('hidden');
+        }
+    })();
+</script>

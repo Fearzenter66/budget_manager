@@ -3,8 +3,9 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
 from core.auth_backend import EncryptedUsernameBackend
+from core.expense_stats import PERIOD_CHOICES, get_home_charts
 from core.models import CustomUser
-from core.web.forms import LoginForm, RegisterForm
+from core.web.forms import ExpenseForm, IncomeForm, LoginForm, RegisterForm
 
 
 def welcome(request):
@@ -21,8 +22,18 @@ def home(request):
     """
     Renders the home page
     """
+    period = request.GET.get('period', 'month')
+    if period not in dict(PERIOD_CHOICES):
+        period = 'month'
+
+    charts = get_home_charts(request.user, period)
     return render(request, 'home.html', {
         'username': request.user.get_decrypted_username(),
+        'period': charts['period'],
+        'period_choices': PERIOD_CHOICES,
+        'period_label': charts['period_label'],
+        'expenses_chart': charts['expenses'],
+        'incomes_chart': charts['incomes'],
     })
 
 
@@ -71,6 +82,34 @@ def register_view(request):
         return redirect('web:home')
 
     return render(request, 'register.html', {'form': form})
+
+
+@login_required
+def add_expense_view(request):
+    form = ExpenseForm(request.user, request.POST or None)
+
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        return redirect('web:home')
+
+    return render(request, 'expense_add.html', {
+        'username': request.user.get_decrypted_username(),
+        'form': form,
+    })
+
+
+@login_required
+def add_income_view(request):
+    form = IncomeForm(request.user, request.POST or None)
+
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        return redirect('web:home')
+
+    return render(request, 'income_add.html', {
+        'username': request.user.get_decrypted_username(),
+        'form': form,
+    })
 
 
 @login_required

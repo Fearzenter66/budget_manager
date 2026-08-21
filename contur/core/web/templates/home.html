@@ -4,7 +4,181 @@
 
 {% block app_content %}
 <div class="app-content">
-    <h1 class="page-title">Главная</h1>
-    <p class="page-subtitle">Добро пожаловать в Контур. Здесь будет ваш бюджет.</p>
+    <div class="home-header">
+        <div>
+            <h1 class="page-title">Главная</h1>
+            <p class="page-subtitle">Обзор расходов и доходов за выбранный период.</p>
+        </div>
+        <div class="period-filter">
+            {% for value, label in period_choices %}
+                <a href="?period={{ value }}"
+                   class="period-btn{% if period == value %} active{% endif %}">
+                    {{ label }}
+                </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="home-actions">
+        <a href="{% url 'web:add_income' %}" class="btn btn-primary">Добавить доход</a>
+        <a href="{% url 'web:add_expense' %}" class="btn btn-secondary">Добавить расход</a>
+    </div>
+
+    <p class="period-caption">{{ period_label }}</p>
+
+    <div class="charts-grid">
+        <section class="chart-card">
+            <h2 class="chart-title">Расходы по категориям</h2>
+            {% if expenses_chart.values %}
+                <div class="chart-wrap">
+                    <canvas id="expenses-chart"></canvas>
+                </div>
+            {% else %}
+                <p class="chart-empty">Нет расходов за выбранный период.</p>
+            {% endif %}
+        </section>
+
+        <section class="chart-card">
+            <h2 class="chart-title">Доходы по источникам</h2>
+            {% if incomes_chart.values %}
+                <div class="chart-wrap">
+                    <canvas id="incomes-chart"></canvas>
+                </div>
+            {% else %}
+                <p class="chart-empty">Нет доходов за выбранный период.</p>
+            {% endif %}
+        </section>
+    </div>
 </div>
+
+{{ expenses_chart|json_script:"expenses-chart-data" }}
+{{ incomes_chart|json_script:"incomes-chart-data" }}
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .home-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .period-filter {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .period-btn {
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+
+    .period-btn:hover {
+        color: var(--text);
+        border-color: var(--text-muted);
+    }
+
+    .period-btn.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: white;
+    }
+
+    .period-caption {
+        margin-top: 1.5rem;
+        color: var(--text-muted);
+        font-size: 0.95rem;
+    }
+
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+        gap: 1.5rem;
+        margin-top: 1rem;
+    }
+
+    .chart-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        padding: 1.5rem;
+    }
+
+    .chart-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    .chart-wrap {
+        position: relative;
+        max-width: 20rem;
+        margin: 0 auto;
+    }
+
+    .chart-empty {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        text-align: center;
+        padding: 2rem 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+    const chartDefaults = {
+        type: 'pie',
+        options: {
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#94a3b8',
+                        padding: 12,
+                    },
+                },
+            },
+        },
+    };
+
+    function renderPieChart(canvasId, dataElementId) {
+        const canvas = document.getElementById(canvasId);
+        const dataElement = document.getElementById(dataElementId);
+        if (!canvas || !dataElement) {
+            return;
+        }
+
+        const data = JSON.parse(dataElement.textContent);
+        if (!data.values.length) {
+            return;
+        }
+
+        new Chart(canvas, {
+            ...chartDefaults,
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    data: data.values,
+                    backgroundColor: data.colors,
+                    borderColor: '#1a2332',
+                    borderWidth: 2,
+                }],
+            },
+        });
+    }
+
+    renderPieChart('expenses-chart', 'expenses-chart-data');
+    renderPieChart('incomes-chart', 'incomes-chart-data');
+</script>
 {% endblock %}

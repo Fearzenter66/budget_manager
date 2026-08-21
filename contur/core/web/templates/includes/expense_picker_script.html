@@ -1,0 +1,93 @@
+<script>
+    (function () {
+        const categoryInput = document.getElementById('id_category');
+        const subcategoryIdInput = document.getElementById('id_subcategory_id');
+        const subcategoryNameInput = document.getElementById('id_subcategory_name');
+        const subcategoryPicker = document.getElementById('subcategory-picker');
+        const subcategoryAddBtn = document.getElementById('subcategory-add');
+        const subcategoryNewWrap = document.getElementById('subcategory-new-wrap');
+        const subcategoriesByCategory = JSON.parse(
+            document.getElementById('subcategories-data').textContent
+        );
+        const initialSubcategoryId = subcategoryIdInput.value;
+        const hasNewSubcategory = Boolean(subcategoryNameInput.value);
+
+        function clearActive(container) {
+            container.querySelectorAll('.picker-tag.active').forEach((tag) => {
+                tag.classList.remove('active');
+            });
+        }
+
+        function selectCategory(value) {
+            categoryInput.value = value;
+            clearActive(document.getElementById('category-picker'));
+            const activeTag = document.querySelector(
+                `#category-picker .picker-tag[data-value="${CSS.escape(value)}"]`
+            );
+            if (activeTag) {
+                activeTag.classList.add('active');
+            }
+            renderSubcategories(value);
+        }
+
+        function renderSubcategories(category) {
+            subcategoryPicker.innerHTML = '';
+
+            if (!hasNewSubcategory) {
+                subcategoryIdInput.value = '';
+                subcategoryNameInput.value = '';
+                subcategoryNewWrap.classList.add('hidden');
+            }
+
+            const items = subcategoriesByCategory[category] || [];
+            items.forEach((item) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'picker-tag';
+                button.dataset.picker = 'subcategory';
+                button.dataset.value = item.id;
+                button.style.setProperty('--tag-color', item.color);
+                button.innerHTML = `<span class="picker-dot"></span>${item.name}`;
+
+                if (String(initialSubcategoryId) === String(item.id) && categoryInput.value === category) {
+                    button.classList.add('active');
+                    subcategoryIdInput.value = item.id;
+                }
+
+                button.addEventListener('click', () => {
+                    clearActive(subcategoryPicker);
+                    button.classList.add('active');
+                    subcategoryIdInput.value = item.id;
+                    subcategoryNameInput.value = '';
+                    subcategoryNewWrap.classList.add('hidden');
+                });
+
+                subcategoryPicker.appendChild(button);
+            });
+        }
+
+        document.querySelectorAll('#category-picker .picker-tag').forEach((tag) => {
+            if (tag.dataset.value === categoryInput.value) {
+                tag.classList.add('active');
+            }
+            tag.addEventListener('click', () => selectCategory(tag.dataset.value));
+        });
+
+        subcategoryAddBtn.addEventListener('click', () => {
+            clearActive(subcategoryPicker);
+            subcategoryIdInput.value = '';
+            subcategoryNewWrap.classList.remove('hidden');
+            subcategoryNameInput.focus();
+        });
+
+        if (categoryInput.value) {
+            selectCategory(categoryInput.value);
+        } else {
+            selectCategory(document.querySelector('#category-picker .picker-tag').dataset.value);
+        }
+
+        if (hasNewSubcategory) {
+            subcategoryNewWrap.classList.remove('hidden');
+        }
+    })();
+</script>

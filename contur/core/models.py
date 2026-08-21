@@ -2,7 +2,7 @@ import os
 from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-from enum import Enum
+from django.utils.timezone import localdate
 from django.core.exceptions import ValidationError, ImproperlyConfigured
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
@@ -46,6 +46,53 @@ def decrypt_value(value):
         return None
 #endregion
 
+CURRENCY_CHOICES = (
+    ('₽', 'Российский рубль'),
+    ('$', 'Американский доллар'),
+    ('€', 'Евро'),
+)
+
+
+class ExpenseCategory(models.TextChoices):
+    """
+    Категории расходов.
+
+    У каждого элемента два значения:
+    - первое ('food') — код, который хранится в базе данных;
+    - второе ('Еда') — подпись, которую видит пользователь.
+
+    В коде: ExpenseCategory.FOOD -> 'food', ExpenseCategory.FOOD.label -> 'Еда'
+    У модели: obj.get_category_display() -> 'Еда'
+    """
+    FOOD = 'food', 'Еда'
+    HOME = 'home', 'Дом'
+    PERSONAL = 'personal', 'На себя'
+    TRANSPORT = 'transport', 'Транспорт'
+    HEALTH = 'health', 'Здоровье'
+    LEISURE = 'leisure', 'Отдых'
+    BAD_HABITS = 'bad_habits', 'Вредные привычки'
+    OTHER = 'other', 'Прочее'
+
+    @classmethod
+    def get_color(cls, value):
+        try:
+            return EXPENSE_CATEGORY_COLORS[cls(value)]
+        except (KeyError, ValueError):
+            return EXPENSE_CATEGORY_COLORS[cls.OTHER]
+
+
+EXPENSE_CATEGORY_COLORS = {
+    ExpenseCategory.FOOD: '#22c55e',
+    ExpenseCategory.HOME: '#3b82f6',
+    ExpenseCategory.PERSONAL: '#a855f7',
+    ExpenseCategory.TRANSPORT: '#f59e0b',
+    ExpenseCategory.HEALTH: '#ef4444',
+    ExpenseCategory.LEISURE: '#06b6d4',
+    ExpenseCategory.BAD_HABITS: '#78716c',
+    ExpenseCategory.OTHER: '#64748b',
+}
+
+
 class CustomUser(AbstractUser):
     """
         Model <<User>>
@@ -54,7 +101,7 @@ class CustomUser(AbstractUser):
         - updated: last user`s data update date
         - deleted: date the user was deleted
     """
-    currency = models.CharField(max_length=20, choices=(('₽', 'Российский рубль'), ('$', 'Американский доллар'), ('€', "Евро")), default='₽')
+    currency = models.CharField(max_length=20, choices=CURRENCY_CHOICES, default='₽')
     is_email_verified = models.BooleanField(null=False, default=False)
 
     groups = models.ManyToManyField(
@@ -150,3 +197,80 @@ class CustomUser(AbstractUser):
             The decrypted username
         """
         return decrypt_value(self.username)
+
+
+class Subcategory(models.Model):
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='subcategories',
+        verbose_name='Пользователь',
+    )
+    name = models.CharField(max_length=100, verbose_name='Название')
+    category = models.CharField(max_length=20, choices=ExpenseCategory.choices, verbose_name='Категория')
+
+    class Meta:
+        verbose_name = 'Подкатегория'
+        verbose_name_plural = 'Подкатегории'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'name', 'category'],
+                name='unique_user_subcategory',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.get_category_display()}: {self.name}'
+
+    @property
+    def category_color(self):
+        return ExpenseCategory.get_color(self.category)
+
+
+class Expense(models.Model):
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='expenses',
+        verbose_name='Пользователь',
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Сумма')
+    currency = models.CharField(max_length=20, choices=CURRENCY_CHOICES, verbose_name='Валюта')
+    operation_date = models.DateField(default=localdate, verbose_name='Дата операции')
+    note = models.TextField(blank=True, verbose_name='Пояснение')
+    subcategory = models.ForeignKey(
+        Subcategory,
+        on_delete=models.PROTECT,
+        related_name='expenses',
+        verbose_name='Подкатегория',
+    )
+
+    class Meta:
+        verbose_name = 'Трата'
+        verbose_name_plural = 'Траты'
+        ordering = ['-operation_date', '-id']
+
+    def __str__(self):
+        return f'{self.amount} {self.currency} ({self.operation_date})'
+
+
+class Income(models.Model):
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='incomes',
+        verbose_name='Пользователь',
+    )
+    operation_date = models.DateField(default=localdate, verbose_name='Дата')
+    source = models.CharField(max_length=200, verbose_name='Источник дохода')
+    amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Сумма')
+    currency = models.CharField(max_length=20, choices=CURRENCY_CHOICES, verbose_name='Валюта')
+    note = models.TextField(blank=True, verbose_name='Пояснение')
+
+    class Meta:
+        verbose_name = 'Доход'
+        verbose_name_plural = 'Доходы'
+        ordering = ['-operation_date', '-id']
+
+    def __str__(self):
+        return f'{self.source}: {self.amount} {self.currency} ({self.operation_date})'

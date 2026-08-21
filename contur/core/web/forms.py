@@ -1,8 +1,228 @@
+from datetime import date
+
 from django import forms
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
-from core.models import CustomUser
+from core.models import CURRENCY_CHOICES, CustomUser, Expense, ExpenseCategory, Income, Subcategory
+
+
+class TransactionFormMixin:
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+        self.fields['currency'].initial = user.currency
+        self.fields['operation_date'].initial = date.today()
+
+
+class ExpenseForm(TransactionFormMixin, forms.Form):
+    amount = forms.DecimalField(
+        label='Сумма',
+        min_value=0.01,
+        max_digits=12,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-input',
+            'placeholder': '0.00',
+            'step': '0.01',
+        }),
+    )
+    currency = forms.ChoiceField(
+        label='Валюта',
+        choices=CURRENCY_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-input'}),
+    )
+    operation_date = forms.DateField(
+        label='Дата операции',
+        widget=forms.DateInput(attrs={
+            'class': 'form-input',
+            'type': 'date',
+        }),
+    )
+    category = forms.ChoiceField(
+        choices=ExpenseCategory.choices,
+        widget=forms.HiddenInput(),
+    )
+    subcategory_id = forms.IntegerField(
+        required=False,
+        widget=forms.HiddenInput(),
+    )
+    subcategory_name = forms.CharField(
+        required=False,
+        max_length=100,
+        widget=forms.TextInput(attrs={
+            'class': 'form-input picker-new-field',
+            'placeholder': 'Название новой подкатегории',
+        }),
+    )
+    note = forms.CharField(
+        label='Пояснение',
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-input',
+            'placeholder': 'Комментарий к операции',
+            'rows': 3,
+        }),
+    )
+
+    def __init__(self, user, *args, **kwargs):
+        super().__init__(user, *args, **kwargs)
+        if not self.initial.get('category'):
+            self.initial['category'] = ExpenseCategory.FOOD
+
+    @property
+    def category_options(self):
+        return [
+            {
+                'value': choice.value,
+                'label': choice.label,
+                'color': ExpenseCategory.get_color(choice.value),
+            }
+            for choice in ExpenseCategory
+        ]
+
+    @property
+    def subcategories_by_category(self):
+        grouped = {}
+        for sub in Subcategory.objects.filter(user=self.user).order_by('name'):
+            grouped.setdefault(sub.category, []).append({
+                'id': sub.id,
+                'name': sub.name,
+                'color': ExpenseCategory.get_color(sub.category),
+            })
+        return grouped
+
+    def clean(self):
+        cleaned_data = super().clean()
+        subcategory_id = cleaned_data.get('subcategory_id')
+        subcategory_name = (cleaned_data.get('subcategory_name') or '').strip()
+        category = cleaned_data.get('category')
+
+        if subcategory_id:
+            try:
+                subcategory = Subcategory.objects.get(
+                    pk=subcategory_id,
+                    user=self.user,
+                    category=category,
+                )
+            except Subcategory.DoesNotExist:
+                self.add_error('subcategory_id', 'Выберите существующую подкатегорию.')
+            else:
+                cleaned_data['subcategory'] = subcategory
+        elif subcategory_name:
+            cleaned_data['subcategory_name'] = subcategory_name
+        else:
+            raise ValidationError('Выберите подкатегорию или создайте новую.')
+
+        return cleaned_data
+
+    def save(self):
+        subcategory = self.cleaned_data.get('subcategory')
+        if subcategory is None:
+            subcategory, _ = Subcategory.objects.get_or_create(
+                user=self.user,
+                category=self.cleaned_data['category'],
+                name=self.cleaned_data['subcategory_name'],
+            )
+        return Expense.objects.create(
+            user=self.user,
+            amount=self.cleaned_data['amount'],
+            currency=self.cleaned_data['currency'],
+            operation_date=self.cleaned_data['operation_date'],
+            note=self.cleaned_data['note'],
+            subcategory=subcategory,
+        )
+
+
+class IncomeForm(TransactionFormMixin, forms.Form):
+    operation_date = forms.DateField(
+        label='Дата',
+        widget=forms.DateInput(attrs={
+            'class': 'form-input',
+            'type': 'date',
+        }),
+    )
+    source = forms.CharField(
+        required=False,
+        max_length=200,
+        widget=forms.HiddenInput(),
+    )
+    source_name = forms.CharField(
+        required=False,
+        max_length=200,
+        widget=forms.TextInput(attrs={
+            'class': 'form-input picker-new-field',
+            'placeholder': 'Название нового источника',
+        }),
+    )
+    amount = forms.DecimalField(
+        label='Сумма',
+        min_value=0.01,
+        max_digits=12,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-input',
+            'placeholder': '0.00',
+            'step': '0.01',
+        }),
+    )
+    currency = forms.ChoiceField(
+        label='Валюта',
+        choices=CURRENCY_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-input'}),
+    )
+    note = forms.CharField(
+        label='Пояснение',
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-input',
+            'placeholder': 'Комментарий к операции',
+            'rows': 3,
+        }),
+    )
+
+    @property
+    def existing_sources(self):
+        from core.expense_stats import INCOME_SOURCE_COLORS
+
+        sources = (
+            Income.objects
+            .filter(user=self.user)
+            .values_list('source', flat=True)
+            .distinct()
+            .order_by('source')
+        )
+        return [
+            {
+                'name': source,
+                'color': INCOME_SOURCE_COLORS[index % len(INCOME_SOURCE_COLORS)],
+            }
+            for index, source in enumerate(sources)
+        ]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        source = (cleaned_data.get('source') or '').strip()
+        source_name = (cleaned_data.get('source_name') or '').strip()
+
+        if source:
+            cleaned_data['source'] = source
+        elif source_name:
+            cleaned_data['source'] = source_name
+        else:
+            self.add_error('source_name', 'Выберите источник дохода или создайте новый.')
+
+        return cleaned_data
+
+    def save(self):
+        return Income.objects.create(
+            user=self.user,
+            operation_date=self.cleaned_data['operation_date'],
+            source=self.cleaned_data['source'],
+            amount=self.cleaned_data['amount'],
+            currency=self.cleaned_data['currency'],
+            note=self.cleaned_data['note'],
+        )
 
 
 class LoginForm(forms.Form):
