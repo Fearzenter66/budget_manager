@@ -20,8 +20,8 @@
     </div>
 
     <div class="home-actions">
-        <a href="{% url 'web:add_income' %}" class="btn btn-primary">Добавить доход</a>
-        <a href="{% url 'web:add_expense' %}" class="btn btn-secondary">Добавить расход</a>
+        <a href="{% url 'web:add_expense' %}" class="btn btn-primary">Добавить расход</a>
+        <a href="{% url 'web:add_income' %}" class="btn btn-secondary">Добавить доход</a>
     </div>
 
     <p class="period-caption">{{ period_label }}</p>
@@ -29,9 +29,13 @@
     <div class="charts-grid">
         <section class="chart-card">
             <h2 class="chart-title">Расходы по категориям</h2>
+            <p class="chart-hint">Наведите на категорию, чтобы увидеть подкатегории</p>
             {% if expenses_chart.values %}
-                <div class="chart-wrap">
-                    <canvas id="expenses-chart"></canvas>
+                <div class="chart-area">
+                    <div class="chart-wrap">
+                        <canvas id="expenses-chart"></canvas>
+                    </div>
+                    <div class="chart-legend" id="expenses-chart-legend"></div>
                 </div>
             {% else %}
                 <p class="chart-empty">Нет расходов за выбранный период.</p>
@@ -41,8 +45,11 @@
         <section class="chart-card">
             <h2 class="chart-title">Доходы по источникам</h2>
             {% if incomes_chart.values %}
-                <div class="chart-wrap">
-                    <canvas id="incomes-chart"></canvas>
+                <div class="chart-area">
+                    <div class="chart-wrap">
+                        <canvas id="incomes-chart"></canvas>
+                    </div>
+                    <div class="chart-legend" id="incomes-chart-legend"></div>
                 </div>
             {% else %}
                 <p class="chart-empty">Нет доходов за выбранный период.</p>
@@ -116,13 +123,50 @@
     .chart-title {
         font-size: 1.1rem;
         font-weight: 600;
+        margin-bottom: 0.35rem;
+    }
+
+    .chart-hint {
+        color: var(--text-muted);
+        font-size: 0.85rem;
         margin-bottom: 1rem;
+    }
+
+    .chart-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
 
     .chart-wrap {
         position: relative;
-        max-width: 20rem;
-        margin: 0 auto;
+        width: 16rem;
+        height: 16rem;
+        flex-shrink: 0;
+    }
+
+    .chart-legend {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.5rem 1rem;
+        margin-top: 1rem;
+        width: 100%;
+    }
+
+    .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+
+    .legend-dot {
+        width: 0.6rem;
+        height: 0.6rem;
+        border-radius: 50%;
+        flex-shrink: 0;
     }
 
     .chart-empty {
@@ -137,22 +181,30 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
-    const chartDefaults = {
-        type: 'pie',
-        options: {
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        color: '#94a3b8',
-                        padding: 12,
-                    },
-                },
+    const pieChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false,
             },
         },
     };
 
-    function renderPieChart(canvasId, dataElementId) {
+    function renderChartLegend(containerId, labels, colors) {
+        const container = document.getElementById(containerId);
+        if (!container) {
+            return;
+        }
+
+        container.innerHTML = labels.map((label, index) => (
+            `<span class="legend-item">` +
+            `<span class="legend-dot" style="background-color: ${colors[index]}"></span>` +
+            `${label}</span>`
+        )).join('');
+    }
+
+    function renderIncomeChart(canvasId, dataElementId, legendId) {
         const canvas = document.getElementById(canvasId);
         const dataElement = document.getElementById(dataElementId);
         if (!canvas || !dataElement) {
@@ -164,8 +216,10 @@
             return;
         }
 
+        renderChartLegend(legendId, data.labels, data.colors);
+
         new Chart(canvas, {
-            ...chartDefaults,
+            type: 'pie',
             data: {
                 labels: data.labels,
                 datasets: [{
@@ -175,10 +229,144 @@
                     borderWidth: 2,
                 }],
             },
+            options: pieChartOptions,
         });
     }
 
-    renderPieChart('expenses-chart', 'expenses-chart-data');
-    renderPieChart('incomes-chart', 'incomes-chart-data');
+    function renderExpensesChart(canvasId, dataElementId, legendId) {
+        const canvas = document.getElementById(canvasId);
+        const dataElement = document.getElementById(dataElementId);
+        if (!canvas || !dataElement) {
+            return;
+        }
+
+        const originalData = JSON.parse(dataElement.textContent);
+        if (!originalData.values.length) {
+            return;
+        }
+
+        let expandedCategoryKey = null;
+        let sliceCategoryKeys = [...originalData.categories];
+
+        renderChartLegend(legendId, originalData.labels, originalData.colors);
+
+        const chart = new Chart(canvas, {
+            type: 'pie',
+            data: buildExpenseChartData(originalData, null),
+            options: {
+                ...pieChartOptions,
+                plugins: {
+                    legend: {
+                        display: false,
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title(items) {
+                                if (!items.length) {
+                                    return '';
+                                }
+                                const categoryKey = sliceCategoryKeys[items[0].dataIndex];
+                                if (expandedCategoryKey && categoryKey === expandedCategoryKey) {
+                                    return `${ExpenseCategoryLabel(categoryKey)} · ${items[0].label}`;
+                                }
+                                return items[0].label;
+                            },
+                        },
+                    },
+                },
+                onHover(event, activeElements) {
+                    if (!activeElements.length) {
+                        return;
+                    }
+
+                    const categoryKey = sliceCategoryKeys[activeElements[0].index];
+                    const subcategories = originalData.subcategories[categoryKey];
+                    if (!subcategories || subcategories.labels.length <= 1) {
+                        if (expandedCategoryKey !== null) {
+                            collapseExpenseChart();
+                        }
+                        return;
+                    }
+
+                    if (expandedCategoryKey !== categoryKey) {
+                        expandExpenseChart(categoryKey);
+                    }
+                },
+            },
+        });
+
+        function ExpenseCategoryLabel(categoryKey) {
+            const index = originalData.categories.indexOf(categoryKey);
+            return index >= 0 ? originalData.labels[index] : categoryKey;
+        }
+
+        function buildExpenseChartData(data, expandedKey) {
+            if (!expandedKey) {
+                sliceCategoryKeys = [...data.categories];
+                return {
+                    labels: [...data.labels],
+                    datasets: [{
+                        data: [...data.values],
+                        backgroundColor: [...data.colors],
+                        borderColor: '#1a2332',
+                        borderWidth: 2,
+                    }],
+                };
+            }
+
+            const labels = [];
+            const values = [];
+            const colors = [];
+            sliceCategoryKeys = [];
+
+            data.categories.forEach((categoryKey, index) => {
+                if (categoryKey === expandedKey) {
+                    const subcategories = data.subcategories[categoryKey];
+                    subcategories.labels.forEach((label, subIndex) => {
+                        labels.push(label);
+                        values.push(subcategories.values[subIndex]);
+                        colors.push(subcategories.colors[subIndex]);
+                        sliceCategoryKeys.push(categoryKey);
+                    });
+                } else {
+                    labels.push(data.labels[index]);
+                    values.push(data.values[index]);
+                    colors.push(data.colors[index]);
+                    sliceCategoryKeys.push(categoryKey);
+                }
+            });
+
+            return {
+                labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    borderColor: '#1a2332',
+                    borderWidth: 2,
+                }],
+            };
+        }
+
+        function expandExpenseChart(categoryKey) {
+            expandedCategoryKey = categoryKey;
+            const nextData = buildExpenseChartData(originalData, categoryKey);
+            chart.data.labels = nextData.labels;
+            chart.data.datasets = nextData.datasets;
+            chart.update('none');
+        }
+
+        function collapseExpenseChart() {
+            expandedCategoryKey = null;
+            const nextData = buildExpenseChartData(originalData, null);
+            chart.data.labels = nextData.labels;
+            chart.data.datasets = nextData.datasets;
+            chart.update('none');
+        }
+
+        canvas.addEventListener('mouseleave', collapseExpenseChart);
+    }
+
+    renderExpensesChart('expenses-chart', 'expenses-chart-data', 'expenses-chart-legend');
+    renderIncomeChart('incomes-chart', 'incomes-chart-data', 'incomes-chart-legend');
 </script>
 {% endblock %}

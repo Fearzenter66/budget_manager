@@ -51,26 +51,78 @@ def get_period_range(period):
     return period, start, today, periods[period]
 
 
+def get_subcategory_colors(base_color, count):
+    if count <= 1:
+        return [base_color]
+
+    hex_color = base_color.lstrip('#')
+    red = int(hex_color[0:2], 16)
+    green = int(hex_color[2:4], 16)
+    blue = int(hex_color[4:6], 16)
+    colors = []
+
+    for index in range(count):
+        factor = 0.45 + (0.55 * index / max(count - 1, 1))
+        colors.append(
+            '#{:02x}{:02x}{:02x}'.format(
+                min(255, int(red + (255 - red) * (1 - factor))),
+                min(255, int(green + (255 - green) * (1 - factor))),
+                min(255, int(blue + (255 - blue) * (1 - factor))),
+            )
+        )
+
+    return colors
+
+
 def get_expenses_by_category(expenses_queryset):
-    totals = {}
+    category_totals = {}
+    subcategory_totals = {}
+
     for expense in expenses_queryset.select_related('subcategory'):
         category = expense.subcategory.decrypted_category
-        totals[category] = totals.get(category, 0) + expense.decrypted_amount
+        subcategory_name = expense.subcategory.name
+        amount = expense.decrypted_amount
 
-    sorted_totals = sorted(totals.items(), key=lambda item: item[1], reverse=True)
+        category_totals[category] = category_totals.get(category, 0) + amount
+        subcategory_totals.setdefault(category, {})
+        subcategory_totals[category][subcategory_name] = (
+            subcategory_totals[category].get(subcategory_name, 0) + amount
+        )
+
+    sorted_totals = sorted(category_totals.items(), key=lambda item: item[1], reverse=True)
     labels = []
     values = []
     colors = []
+    categories = []
+    subcategories = {}
 
     for category, total in sorted_totals:
         labels.append(ExpenseCategory(category).label)
         values.append(float(total))
         colors.append(ExpenseCategory.get_color(category))
+        categories.append(category)
+
+        sorted_subcategories = sorted(
+            subcategory_totals.get(category, {}).items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+        base_color = ExpenseCategory.get_color(category)
+        sub_labels = [name for name, _ in sorted_subcategories]
+        sub_values = [float(value) for _, value in sorted_subcategories]
+        sub_colors = get_subcategory_colors(base_color, len(sub_labels))
+        subcategories[category] = {
+            'labels': sub_labels,
+            'values': sub_values,
+            'colors': sub_colors,
+        }
 
     return {
         'labels': labels,
         'values': values,
         'colors': colors,
+        'categories': categories,
+        'subcategories': subcategories,
     }
 
 
