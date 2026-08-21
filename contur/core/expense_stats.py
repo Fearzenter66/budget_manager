@@ -1,6 +1,5 @@
 import calendar
 
-from django.db.models import Sum
 from django.utils.timezone import localdate
 
 from core.models import ExpenseCategory
@@ -53,21 +52,19 @@ def get_period_range(period):
 
 
 def get_expenses_by_category(expenses_queryset):
-    aggregated = (
-        expenses_queryset
-        .values('subcategory__category')
-        .annotate(total=Sum('amount'))
-        .order_by('-total')
-    )
+    totals = {}
+    for expense in expenses_queryset.select_related('subcategory'):
+        category = expense.subcategory.decrypted_category
+        totals[category] = totals.get(category, 0) + expense.decrypted_amount
 
+    sorted_totals = sorted(totals.items(), key=lambda item: item[1], reverse=True)
     labels = []
     values = []
     colors = []
 
-    for row in aggregated:
-        category = row['subcategory__category']
+    for category, total in sorted_totals:
         labels.append(ExpenseCategory(category).label)
-        values.append(float(row['total']))
+        values.append(float(total))
         colors.append(ExpenseCategory.get_color(category))
 
     return {
@@ -78,20 +75,19 @@ def get_expenses_by_category(expenses_queryset):
 
 
 def get_income_by_source(incomes_queryset):
-    aggregated = (
-        incomes_queryset
-        .values('source')
-        .annotate(total=Sum('amount'))
-        .order_by('-total')
-    )
+    totals = {}
+    for income in incomes_queryset:
+        source = income.decrypted_source
+        totals[source] = totals.get(source, 0) + income.decrypted_amount
 
+    sorted_totals = sorted(totals.items(), key=lambda item: item[1], reverse=True)
     labels = []
     values = []
     colors = []
 
-    for index, row in enumerate(aggregated):
-        labels.append(row['source'])
-        values.append(float(row['total']))
+    for index, (source, total) in enumerate(sorted_totals):
+        labels.append(source)
+        values.append(float(total))
         colors.append(INCOME_SOURCE_COLORS[index % len(INCOME_SOURCE_COLORS)])
 
     return {

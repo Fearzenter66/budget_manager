@@ -85,10 +85,10 @@ class ExpenseForm(TransactionFormMixin, forms.Form):
     def subcategories_by_category(self):
         grouped = {}
         for sub in Subcategory.objects.filter(user=self.user).order_by('name'):
-            grouped.setdefault(sub.category, []).append({
+            grouped.setdefault(sub.decrypted_category, []).append({
                 'id': sub.id,
                 'name': sub.name,
-                'color': ExpenseCategory.get_color(sub.category),
+                'color': ExpenseCategory.get_color(sub.decrypted_category),
             })
         return grouped
 
@@ -103,12 +103,14 @@ class ExpenseForm(TransactionFormMixin, forms.Form):
                 subcategory = Subcategory.objects.get(
                     pk=subcategory_id,
                     user=self.user,
-                    category=category,
                 )
             except Subcategory.DoesNotExist:
                 self.add_error('subcategory_id', 'Выберите существующую подкатегорию.')
             else:
-                cleaned_data['subcategory'] = subcategory
+                if subcategory.decrypted_category != category:
+                    self.add_error('subcategory_id', 'Выберите существующую подкатегорию.')
+                else:
+                    cleaned_data['subcategory'] = subcategory
         elif subcategory_name:
             cleaned_data['subcategory_name'] = subcategory_name
         else:
@@ -119,7 +121,7 @@ class ExpenseForm(TransactionFormMixin, forms.Form):
     def save(self):
         subcategory = self.cleaned_data.get('subcategory')
         if subcategory is None:
-            subcategory, _ = Subcategory.objects.get_or_create(
+            subcategory, _ = Subcategory.get_or_create_decrypted(
                 user=self.user,
                 category=self.cleaned_data['category'],
                 name=self.cleaned_data['subcategory_name'],
@@ -185,19 +187,15 @@ class IncomeForm(TransactionFormMixin, forms.Form):
     def existing_sources(self):
         from core.expense_stats import INCOME_SOURCE_COLORS
 
-        sources = (
-            Income.objects
-            .filter(user=self.user)
-            .values_list('source', flat=True)
-            .distinct()
-            .order_by('source')
-        )
+        sources = set()
+        for income in Income.objects.filter(user=self.user):
+            sources.add(income.decrypted_source)
         return [
             {
                 'name': source,
                 'color': INCOME_SOURCE_COLORS[index % len(INCOME_SOURCE_COLORS)],
             }
-            for index, source in enumerate(sources)
+            for index, source in enumerate(sorted(sources))
         ]
 
     def clean(self):

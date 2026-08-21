@@ -1,50 +1,15 @@
-import os
-from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.timezone import localdate
-from django.core.exceptions import ValidationError, ImproperlyConfigured
-from cryptography.fernet import Fernet
-from dotenv import load_dotenv
 
-#region Hashing personal data
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(os.path.join(BASE_DIR, '.env'))  # Loading environment variables
-DATA_KEY = os.getenv('DATA_KEY', None)
-
-if DATA_KEY is None:
-    raise ImproperlyConfigured("Encryption key not found.")
-
-def encrypt_value(value):
-    """
-    Encrypts a value using the globaly defined DATA_KEY
-    Args:
-        value: The value to encrypt
-    Returns:
-        The encrypted value
-    """
-    cipher_suite = Fernet(DATA_KEY.encode())  # Using globaly variable DATA_KEY
-    if value is None or not isinstance(value, str):
-        return None
-    return cipher_suite.encrypt(value.encode()).decode()
-
-def decrypt_value(value):
-    """
-    Decrypts a value using the globaly defined DATA_KEY
-    Args:
-        value: The value to decrypt
-    Returns:
-        The decrypted value
-    """
-    cipher_suite = Fernet(DATA_KEY.encode())  # Similarly for decryption
-    if value is None or not isinstance(value, str):
-        return None
-    try:
-        return cipher_suite.decrypt(value.encode()).decode()
-    except Exception as e:
-        print(f'Decryption error: {e}')
-        return None
-#endregion
+from core.encryption import (
+    decrypt_decimal,
+    decrypt_field,
+    encrypt_decimal,
+    encrypt_field,
+    encrypt_value,
+    decrypt_value,
+)
 
 CURRENCY_CHOICES = (
     ('₽', 'Российский рубль'),
@@ -54,16 +19,6 @@ CURRENCY_CHOICES = (
 
 
 class ExpenseCategory(models.TextChoices):
-    """
-    Категории расходов.
-
-    У каждого элемента два значения:
-    - первое ('food') — код, который хранится в базе данных;
-    - второе ('Еда') — подпись, которую видит пользователь.
-
-    В коде: ExpenseCategory.FOOD -> 'food', ExpenseCategory.FOOD.label -> 'Еда'
-    У модели: obj.get_category_display() -> 'Еда'
-    """
     FOOD = 'food', 'Еда'
     HOME = 'home', 'Дом'
     PERSONAL = 'personal', 'На себя'
@@ -94,13 +49,6 @@ EXPENSE_CATEGORY_COLORS = {
 
 
 class CustomUser(AbstractUser):
-    """
-        Model <<User>>
-
-        - currency: user`s default currency
-        - updated: last user`s data update date
-        - deleted: date the user was deleted
-    """
     currency = models.CharField(max_length=20, choices=CURRENCY_CHOICES, default='₽')
     is_email_verified = models.BooleanField(null=False, default=False)
 
@@ -109,7 +57,7 @@ class CustomUser(AbstractUser):
         verbose_name='groups',
         blank=True,
         help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.',
-        related_name='customuser_set', 
+        related_name='customuser_set',
         related_query_name='customuser',
     )
     user_permissions = models.ManyToManyField(
@@ -117,7 +65,7 @@ class CustomUser(AbstractUser):
         verbose_name='user permissions',
         blank=True,
         help_text='Specific permissions for this user.',
-        related_name='customuser_set', 
+        related_name='customuser_set',
         related_query_name='customuser',
     )
 
@@ -125,27 +73,19 @@ class CustomUser(AbstractUser):
     deleted = models.BooleanField(null=False, default=False)
 
     def save(self, *args, **kwargs):
-        """
-        Saves the user to the database
-        Encrypts the username, email, first name and last name
-        """
         if self.username:
             self.username = encrypt_value(self.normalize_username(self.username))
         self.email = encrypt_value(self.email)
         self.first_name = encrypt_value(self.first_name)
         self.last_name = encrypt_value(self.last_name)
-
         super().save(*args, **kwargs)
 
     @classmethod
     def decrypted_objects(cls):
-        """
-        Returns a list of decrypted parameters of the user
-        """
         queryset = cls.objects.all()
         decrypted_data = []
         for obj in queryset:
-            data = {
+            decrypted_data.append({
                 'id': obj.id,
                 'first_name': decrypt_value(obj.first_name),
                 'last_name': decrypt_value(obj.last_name),
@@ -160,30 +100,15 @@ class CustomUser(AbstractUser):
                 'is_email_verified': obj.is_email_verified,
                 'updated': obj.updated,
                 'deleted': obj.deleted,
-            }
-            decrypted_data.append(data)
+            })
         return decrypted_data
 
     @staticmethod
     def normalize_username(username):
-        """
-        Normalizes the username
-        Args:
-            username: The username to normalize
-        Returns:
-            The normalized username (lowercase and stripped)
-        """
         return username.strip().lower()
 
     @classmethod
     def get_by_username(cls, username):
-        """
-        Gets a user by decrypted username
-        Args:
-            username: The username to get the user by
-        Returns:
-            The user if found, otherwise None
-        """
         username = cls.normalize_username(username)
         for user in cls.objects.filter(deleted=False):
             if decrypt_value(user.username) == username:
@@ -191,11 +116,6 @@ class CustomUser(AbstractUser):
         return None
 
     def get_decrypted_username(self):
-        """
-        Gets the decrypted username
-        Returns:
-            The decrypted username
-        """
         return decrypt_value(self.username)
 
 
@@ -207,24 +127,51 @@ class Subcategory(models.Model):
         verbose_name='Пользователь',
     )
     name = models.CharField(max_length=100, verbose_name='Название')
-    category = models.CharField(max_length=20, choices=ExpenseCategory.choices, verbose_name='Категория')
+    category = models.TextField(verbose_name='Категория')
 
     class Meta:
         verbose_name = 'Подкатегория'
         verbose_name_plural = 'Подкатегории'
-        constraints = [
-            models.UniqueConstraint(
-                fields=['user', 'name', 'category'],
-                name='unique_user_subcategory',
-            ),
-        ]
+
+    def save(self, *args, **kwargs):
+        category = self.decrypted_category
+        ExpenseCategory(category)
+        self.category = encrypt_field(category)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.get_category_display()}: {self.name}'
 
     @property
+    def decrypted_category(self):
+        return decrypt_field(self.category)
+
+    def get_category_display(self):
+        try:
+            return ExpenseCategory(self.decrypted_category).label
+        except ValueError:
+            return self.decrypted_category
+
+    @property
     def category_color(self):
-        return ExpenseCategory.get_color(self.category)
+        return ExpenseCategory.get_color(self.decrypted_category)
+
+    @classmethod
+    def get_by_user_name_category(cls, user, name, category):
+        name = name.strip()
+        for subcategory in cls.objects.filter(user=user, name=name):
+            if subcategory.decrypted_category == category:
+                return subcategory
+        return None
+
+    @classmethod
+    def get_or_create_decrypted(cls, user, name, category):
+        existing = cls.get_by_user_name_category(user, name, category)
+        if existing:
+            return existing, False
+        subcategory = cls(user=user, name=name.strip(), category=category)
+        subcategory.save()
+        return subcategory, True
 
 
 class Expense(models.Model):
@@ -234,7 +181,7 @@ class Expense(models.Model):
         related_name='expenses',
         verbose_name='Пользователь',
     )
-    amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Сумма')
+    amount = models.TextField(verbose_name='Сумма')
     currency = models.CharField(max_length=20, choices=CURRENCY_CHOICES, verbose_name='Валюта')
     operation_date = models.DateField(default=localdate, verbose_name='Дата операции')
     note = models.TextField(blank=True, verbose_name='Пояснение')
@@ -250,8 +197,21 @@ class Expense(models.Model):
         verbose_name_plural = 'Траты'
         ordering = ['-operation_date', '-id']
 
+    def save(self, *args, **kwargs):
+        self.amount = encrypt_decimal(self.decrypted_amount)
+        self.note = encrypt_field(self.decrypted_note)
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f'{self.amount} {self.currency} ({self.operation_date})'
+        return f'{self.decrypted_amount} {self.currency} ({self.operation_date})'
+
+    @property
+    def decrypted_amount(self):
+        return decrypt_decimal(self.amount)
+
+    @property
+    def decrypted_note(self):
+        return decrypt_field(self.note) or ''
 
 
 class Income(models.Model):
@@ -262,8 +222,8 @@ class Income(models.Model):
         verbose_name='Пользователь',
     )
     operation_date = models.DateField(default=localdate, verbose_name='Дата')
-    source = models.CharField(max_length=200, verbose_name='Источник дохода')
-    amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Сумма')
+    source = models.TextField(verbose_name='Источник дохода')
+    amount = models.TextField(verbose_name='Сумма')
     currency = models.CharField(max_length=20, choices=CURRENCY_CHOICES, verbose_name='Валюта')
     note = models.TextField(blank=True, verbose_name='Пояснение')
 
@@ -272,5 +232,23 @@ class Income(models.Model):
         verbose_name_plural = 'Доходы'
         ordering = ['-operation_date', '-id']
 
+    def save(self, *args, **kwargs):
+        self.source = encrypt_field(self.decrypted_source)
+        self.amount = encrypt_decimal(self.decrypted_amount)
+        self.note = encrypt_field(self.decrypted_note)
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f'{self.source}: {self.amount} {self.currency} ({self.operation_date})'
+        return f'{self.decrypted_source}: {self.decrypted_amount} {self.currency} ({self.operation_date})'
+
+    @property
+    def decrypted_source(self):
+        return decrypt_field(self.source) or ''
+
+    @property
+    def decrypted_amount(self):
+        return decrypt_decimal(self.amount)
+
+    @property
+    def decrypted_note(self):
+        return decrypt_field(self.note) or ''
