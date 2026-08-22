@@ -28,8 +28,13 @@
 
     <div class="charts-grid">
         <section class="chart-card">
-            <h2 class="chart-title">Расходы по категориям</h2>
-            <p class="chart-hint">Наведите на категорию, чтобы увидеть подкатегории</p>
+            <div class="chart-card-header">
+                <div>
+                    <h2 class="chart-title">Расходы по категориям</h2>
+                    <p class="chart-hint">Наведите на категорию, чтобы увидеть подкатегории</p>
+                </div>
+                <a href="{% url 'web:expense_list' %}?period={{ period }}" class="btn btn-secondary btn-sm">Детализация</a>
+            </div>
             {% if expenses_chart.values %}
                 <div class="chart-area">
                     <div class="chart-wrap">
@@ -43,7 +48,12 @@
         </section>
 
         <section class="chart-card">
-            <h2 class="chart-title">Доходы по источникам</h2>
+            <div class="chart-card-header">
+                <div>
+                    <h2 class="chart-title">Доходы по источникам</h2>
+                </div>
+                <a href="{% url 'web:income_list' %}?period={{ period }}" class="btn btn-secondary btn-sm">Детализация</a>
+            </div>
             {% if incomes_chart.values %}
                 <div class="chart-area">
                     <div class="chart-wrap">
@@ -120,10 +130,18 @@
         padding: 1.5rem;
     }
 
+    .chart-card-header .btn {
+        flex-shrink: 0;
+    }
+
     .chart-title {
         font-size: 1.1rem;
         font-weight: 600;
         margin-bottom: 0.35rem;
+    }
+
+    .chart-card-header .chart-hint {
+        margin-bottom: 0;
     }
 
     .chart-hint {

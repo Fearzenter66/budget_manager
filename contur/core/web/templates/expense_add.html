@@ -10,71 +10,7 @@
 
         <form method="post" class="form" id="expense-form">
             {% csrf_token %}
-
-            {% if form.non_field_errors %}
-                <div class="form-errors">
-                    {% for error in form.non_field_errors %}
-                        <p>{{ error }}</p>
-                    {% endfor %}
-                </div>
-            {% endif %}
-
-            <div class="form-group">
-                <label class="form-label" for="{{ form.amount.id_for_label }}">{{ form.amount.label }}</label>
-                {{ form.amount }}
-                {% for error in form.amount.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="{{ form.currency.id_for_label }}">{{ form.currency.label }}</label>
-                {{ form.currency }}
-                {% for error in form.currency.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="{{ form.operation_date.id_for_label }}">{{ form.operation_date.label }}</label>
-                {{ form.operation_date }}
-                {% for error in form.operation_date.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
-            </div>
-
-            <div class="form-group">
-                <span class="form-label">Категория</span>
-                {{ form.category }}
-                <div class="tag-picker picker-row" id="category-picker">
-                    {% for option in form.category_options %}
-                        <button type="button"
-                                class="picker-tag"
-                                data-picker="category"
-                                data-value="{{ option.value }}"
-                                style="--tag-color: {{ option.color }}">
-                            <span class="picker-dot"></span>{{ option.label }}
-                        </button>
-                    {% endfor %}
-                </div>
-                {% for error in form.category.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
-            </div>
-
-            <div class="form-group">
-                <span class="form-label">Подкатегория</span>
-                {{ form.subcategory_id }}
-                <div class="picker-row">
-                    <div class="tag-picker" id="subcategory-picker"></div>
-                    <button type="button" class="picker-tag picker-tag-add" id="subcategory-add" style="--tag-color: var(--accent)">
-                        <span class="picker-plus">+</span>
-                    </button>
-                </div>
-                <div class="picker-new-wrap hidden" id="subcategory-new-wrap">
-                    {{ form.subcategory_name }}
-                </div>
-                {% for error in form.subcategory_id.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
-                {% for error in form.subcategory_name.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="{{ form.note.id_for_label }}">{{ form.note.label }}</label>
-                {{ form.note }}
-                {% for error in form.note.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
-            </div>
+            {% include "includes/expense_form_fields.html" %}
 
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Сохранить</button>

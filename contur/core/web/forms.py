@@ -8,11 +8,13 @@ from core.models import CURRENCY_CHOICES, CustomUser, Expense, ExpenseCategory, 
 
 
 class TransactionFormMixin:
-    def __init__(self, user, *args, **kwargs):
+    def __init__(self, user, *args, instance=None, **kwargs):
         self.user = user
+        self.instance = instance
         super().__init__(*args, **kwargs)
-        self.fields['currency'].initial = user.currency
-        self.fields['operation_date'].initial = date.today()
+        if instance is None:
+            self.fields['currency'].initial = user.currency
+            self.fields['operation_date'].initial = date.today()
 
 
 class ExpenseForm(TransactionFormMixin, forms.Form):
@@ -34,7 +36,7 @@ class ExpenseForm(TransactionFormMixin, forms.Form):
     )
     operation_date = forms.DateField(
         label='Дата операции',
-        widget=forms.DateInput(attrs={
+        widget=forms.DateInput(format='%Y-%m-%d', attrs={
             'class': 'form-input',
             'type': 'date',
         }),
@@ -65,8 +67,17 @@ class ExpenseForm(TransactionFormMixin, forms.Form):
         }),
     )
 
-    def __init__(self, user, *args, **kwargs):
-        super().__init__(user, *args, **kwargs)
+    def __init__(self, user, *args, instance=None, **kwargs):
+        if instance is not None:
+            kwargs.setdefault('initial', {}).update({
+                'amount': instance.decrypted_amount,
+                'currency': instance.currency,
+                'operation_date': instance.operation_date,
+                'category': instance.subcategory.decrypted_category,
+                'subcategory_id': instance.subcategory_id,
+                'note': instance.decrypted_note,
+            })
+        super().__init__(user, *args, instance=instance, **kwargs)
         if not self.initial.get('category'):
             self.initial['category'] = ExpenseCategory.FOOD
 
@@ -126,20 +137,25 @@ class ExpenseForm(TransactionFormMixin, forms.Form):
                 category=self.cleaned_data['category'],
                 name=self.cleaned_data['subcategory_name'],
             )
-        return Expense.objects.create(
-            user=self.user,
-            amount=self.cleaned_data['amount'],
-            currency=self.cleaned_data['currency'],
-            operation_date=self.cleaned_data['operation_date'],
-            note=self.cleaned_data['note'],
-            subcategory=subcategory,
-        )
+        fields = {
+            'amount': self.cleaned_data['amount'],
+            'currency': self.cleaned_data['currency'],
+            'operation_date': self.cleaned_data['operation_date'],
+            'note': self.cleaned_data['note'],
+            'subcategory': subcategory,
+        }
+        if self.instance is not None:
+            for name, value in fields.items():
+                setattr(self.instance, name, value)
+            self.instance.save()
+            return self.instance
+        return Expense.objects.create(user=self.user, **fields)
 
 
 class IncomeForm(TransactionFormMixin, forms.Form):
     operation_date = forms.DateField(
         label='Дата',
-        widget=forms.DateInput(attrs={
+        widget=forms.DateInput(format='%Y-%m-%d', attrs={
             'class': 'form-input',
             'type': 'date',
         }),
@@ -183,6 +199,17 @@ class IncomeForm(TransactionFormMixin, forms.Form):
         }),
     )
 
+    def __init__(self, user, *args, instance=None, **kwargs):
+        if instance is not None:
+            kwargs.setdefault('initial', {}).update({
+                'operation_date': instance.operation_date,
+                'source': instance.decrypted_source,
+                'amount': instance.decrypted_amount,
+                'currency': instance.currency,
+                'note': instance.decrypted_note,
+            })
+        super().__init__(user, *args, instance=instance, **kwargs)
+
     @property
     def existing_sources(self):
         from core.expense_stats import INCOME_SOURCE_COLORS
@@ -213,14 +240,19 @@ class IncomeForm(TransactionFormMixin, forms.Form):
         return cleaned_data
 
     def save(self):
-        return Income.objects.create(
-            user=self.user,
-            operation_date=self.cleaned_data['operation_date'],
-            source=self.cleaned_data['source'],
-            amount=self.cleaned_data['amount'],
-            currency=self.cleaned_data['currency'],
-            note=self.cleaned_data['note'],
-        )
+        fields = {
+            'operation_date': self.cleaned_data['operation_date'],
+            'source': self.cleaned_data['source'],
+            'amount': self.cleaned_data['amount'],
+            'currency': self.cleaned_data['currency'],
+            'note': self.cleaned_data['note'],
+        }
+        if self.instance is not None:
+            for name, value in fields.items():
+                setattr(self.instance, name, value)
+            self.instance.save()
+            return self.instance
+        return Income.objects.create(user=self.user, **fields)
 
 
 class LoginForm(forms.Form):

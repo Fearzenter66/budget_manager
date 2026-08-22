@@ -1,11 +1,42 @@
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 from core.auth_backend import EncryptedUsernameBackend
-from core.expense_stats import PERIOD_CHOICES, get_home_charts
-from core.models import CustomUser
+from core.expense_stats import PERIOD_CHOICES, get_home_charts, get_period_range
+from core.models import CustomUser, Expense, Income
 from core.web.forms import ExpenseForm, IncomeForm, LoginForm, RegisterForm
+
+
+def _get_period(request):
+    period = request.GET.get('period') or request.POST.get('period', 'month')
+    if period not in dict(PERIOD_CHOICES):
+        return 'month'
+    return period
+
+
+def _period_redirect(request, view_name, **kwargs):
+    url = reverse(view_name, kwargs=kwargs)
+    period = _get_period(request)
+    return redirect(f'{url}?period={period}')
+
+
+def _list_period_context(request, queryset):
+    period = _get_period(request)
+    period, start, end, period_label = get_period_range(period)
+    records = queryset.filter(
+        operation_date__gte=start,
+        operation_date__lte=end,
+    )
+    return {
+        'username': request.user.get_decrypted_username(),
+        'period': period,
+        'period_choices': PERIOD_CHOICES,
+        'period_label': period_label,
+        'records': records,
+    }
 
 
 def welcome(request):
@@ -110,6 +141,112 @@ def add_income_view(request):
         'username': request.user.get_decrypted_username(),
         'form': form,
     })
+
+
+def _expense_list_context(request, edit_form=None, editing_id=None):
+    context = _list_period_context(request, request.user.expenses.select_related('subcategory'))
+    context.update({
+        'edit_form': edit_form,
+        'editing_id': editing_id,
+    })
+    return context
+
+
+def _income_list_context(request, edit_form=None, editing_id=None):
+    context = _list_period_context(request, request.user.incomes)
+    context.update({
+        'edit_form': edit_form,
+        'editing_id': editing_id,
+    })
+    return context
+
+
+@login_required
+def expense_list_view(request):
+    edit_form = None
+    editing_id = None
+    edit_pk = request.GET.get('edit')
+    if edit_pk:
+        expense = Expense.objects.filter(pk=edit_pk, user=request.user).first()
+        if expense is not None:
+            edit_form = ExpenseForm(request.user, instance=expense)
+            editing_id = expense.id
+    return render(request, 'expense_list.html', _expense_list_context(
+        request,
+        edit_form=edit_form,
+        editing_id=editing_id,
+    ))
+
+
+@login_required
+def income_list_view(request):
+    edit_form = None
+    editing_id = None
+    edit_pk = request.GET.get('edit')
+    if edit_pk:
+        income = Income.objects.filter(pk=edit_pk, user=request.user).first()
+        if income is not None:
+            edit_form = IncomeForm(request.user, instance=income)
+            editing_id = income.id
+    return render(request, 'income_list.html', _income_list_context(
+        request,
+        edit_form=edit_form,
+        editing_id=editing_id,
+    ))
+
+
+@login_required
+def edit_expense_view(request, pk):
+    expense = get_object_or_404(Expense, pk=pk, user=request.user)
+    if request.method != 'POST':
+        url = reverse('web:expense_list')
+        return redirect(f'{url}?period={_get_period(request)}&edit={pk}')
+
+    form = ExpenseForm(request.user, request.POST, instance=expense)
+    if form.is_valid():
+        form.save()
+        return _period_redirect(request, 'web:expense_list')
+
+    return render(request, 'expense_list.html', _expense_list_context(
+        request,
+        edit_form=form,
+        editing_id=expense.id,
+    ))
+
+
+@login_required
+def edit_income_view(request, pk):
+    income = get_object_or_404(Income, pk=pk, user=request.user)
+    if request.method != 'POST':
+        url = reverse('web:income_list')
+        return redirect(f'{url}?period={_get_period(request)}&edit={pk}')
+
+    form = IncomeForm(request.user, request.POST, instance=income)
+    if form.is_valid():
+        form.save()
+        return _period_redirect(request, 'web:income_list')
+
+    return render(request, 'income_list.html', _income_list_context(
+        request,
+        edit_form=form,
+        editing_id=income.id,
+    ))
+
+
+@login_required
+@require_POST
+def delete_expense_view(request, pk):
+    expense = get_object_or_404(Expense, pk=pk, user=request.user)
+    expense.delete()
+    return _period_redirect(request, 'web:expense_list')
+
+
+@login_required
+@require_POST
+def delete_income_view(request, pk):
+    income = get_object_or_404(Income, pk=pk, user=request.user)
+    income.delete()
+    return _period_redirect(request, 'web:income_list')
 
 
 @login_required

@@ -1,0 +1,154 @@
+<style>
+    .detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .records-table-wrap {
+        margin-top: 1.5rem;
+        overflow-x: auto;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+    }
+
+    .records-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+    }
+
+    .records-table th,
+    .records-table td {
+        padding: 0.9rem 1rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        vertical-align: middle;
+    }
+
+    .records-table th {
+        color: var(--text-muted);
+        font-weight: 500;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .records-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .record-row {
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+
+    .record-row:hover {
+        background: rgba(255, 255, 255, 0.04);
+    }
+
+    .record-category {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+    }
+
+    .record-dot {
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 50%;
+        flex-shrink: 0;
+        background: var(--dot-color, var(--accent));
+    }
+
+    .record-note {
+        color: var(--text-muted);
+        max-width: 16rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .record-amount {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        font-weight: 600;
+    }
+
+    .record-actions {
+        width: 3rem;
+        text-align: right;
+    }
+
+    .delete-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border: 1px solid transparent;
+        border-radius: 0.45rem;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 1.25rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .delete-btn:hover {
+        color: #fca5a5;
+        background: rgba(248, 113, 113, 0.12);
+        border-color: rgba(248, 113, 113, 0.35);
+    }
+
+    .records-empty {
+        color: var(--text-muted);
+        text-align: center;
+        padding: 2.5rem 1rem;
+    }
+
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        background: rgba(7, 11, 18, 0.72);
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+    }
+
+    .modal-overlay.is-open {
+        display: flex;
+    }
+
+    .modal {
+        width: 100%;
+        max-width: 32rem;
+        max-height: calc(100vh - 3rem);
+        overflow: auto;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        padding: 1.75rem;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-sm {
+        max-width: 24rem;
+    }
+
+    .modal-title {
+        font-size: 1.35rem;
+        font-weight: 650;
+        margin-bottom: 0.35rem;
+    }
+
+    .modal-text {
+        color: var(--text-muted);
+        margin-bottom: 1.5rem;
+    }
+</style>

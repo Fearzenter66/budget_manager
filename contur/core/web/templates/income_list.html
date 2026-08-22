@@ -1,0 +1,147 @@
+{% extends "base_app.html" %}
+
+{% block title %}Доходы — Контур{% endblock %}
+
+{% block app_content %}
+<div class="app-content">
+    <div class="detail-header">
+        <div>
+            <h1 class="page-title">Доходы</h1>
+            <p class="page-subtitle">Нажмите на запись, чтобы изменить её. Удаление — крестиком.</p>
+        </div>
+        <div class="period-filter">
+            {% for value, label in period_choices %}
+                <a href="?period={{ value }}"
+                   class="period-btn{% if period == value %} active{% endif %}">
+                    {{ label }}
+                </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="home-actions">
+        <a href="{% url 'web:add_income' %}" class="btn btn-primary">Добавить доход</a>
+        <a href="{% url 'web:home' %}?period={{ period }}" class="btn btn-secondary">На главную</a>
+    </div>
+
+    <p class="period-caption">{{ period_label }}</p>
+
+    <div class="records-table-wrap">
+        {% if records %}
+            <table class="records-table">
+                <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Источник</th>
+                        <th>Сумма</th>
+                        <th>Пояснение</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for income in records %}
+                        <tr class="record-row"
+                            data-edit-url="{% url 'web:income_list' %}?period={{ period }}&edit={{ income.id }}">
+                            <td>{{ income.operation_date|date:"d.m.Y" }}</td>
+                            <td>{{ income.decrypted_source }}</td>
+                            <td class="record-amount">{{ income.decrypted_amount|floatformat:2 }} {{ income.currency }}</td>
+                            <td class="record-note">{{ income.decrypted_note }}</td>
+                            <td class="record-actions">
+                                <button type="button"
+                                        class="delete-btn"
+                                        aria-label="Удалить доход"
+                                        data-delete-url="{% url 'web:delete_income' income.id %}"
+                                        data-delete-message="Удалить доход «{{ income.decrypted_source }}» от {{ income.operation_date|date:'d.m.Y' }} на {{ income.decrypted_amount|floatformat:2 }} {{ income.currency }}?">
+                                    ×
+                                </button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="records-empty">Нет доходов за выбранный период.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal-overlay" id="delete-modal">
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="delete-title">
+        <h2 class="modal-title" id="delete-title">Удалить запись?</h2>
+        <p class="modal-text" id="delete-message"></p>
+        <form method="post" id="delete-form">
+            {% csrf_token %}
+            <input type="hidden" name="period" value="{{ period }}">
+            <div class="form-actions">
+                <button type="submit" class="btn btn-danger">Удалить</button>
+                <button type="button" class="btn btn-secondary" id="delete-cancel">Отмена</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if edit_form %}
+<div class="modal-overlay is-open" id="edit-modal" data-close-url="{% url 'web:income_list' %}?period={{ period }}">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+        <h2 class="modal-title" id="edit-title">Редактировать доход</h2>
+        <p class="modal-text">Измените данные и сохраните запись.</p>
+        <form method="post" class="form" id="income-form" action="{% url 'web:edit_income' editing_id %}">
+            {% csrf_token %}
+            <input type="hidden" name="period" value="{{ period }}">
+            {% include "includes/income_form_fields.html" with form=edit_form %}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+                <a href="{% url 'web:income_list' %}?period={{ period }}" class="btn btn-secondary" id="edit-cancel">Отмена</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include "includes/picker_styles.html" %}
+{% include "includes/detail_list_styles.html" %}
+<style>
+    .period-filter {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .period-btn {
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+
+    .period-btn:hover {
+        color: var(--text);
+        border-color: var(--text-muted);
+    }
+
+    .period-btn.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: white;
+    }
+
+    .period-caption {
+        margin-top: 1.5rem;
+        color: var(--text-muted);
+        font-size: 0.95rem;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+{% include "includes/detail_modals_script.html" %}
+{% if edit_form %}
+    {% include "includes/income_picker_script.html" %}
+{% endif %}
+{% endblock %}
