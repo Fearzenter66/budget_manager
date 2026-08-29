@@ -1,4 +1,5 @@
 import calendar
+from decimal import Decimal
 
 from django.utils.timezone import localdate
 
@@ -48,7 +49,8 @@ def get_period_range(period):
     else:
         start = subtract_months(today.replace(day=1), 11)
 
-    return period, start, today, periods[period]
+    end = today.replace(day=calendar.monthrange(today.year, today.month)[1])
+    return period, start, end, periods[period]
 
 
 def get_subcategory_colors(base_color, count):
@@ -149,7 +151,14 @@ def get_income_by_source(incomes_queryset):
     }
 
 
-def get_home_charts(user, period='month'):
+def get_amount_total(queryset):
+    total = Decimal('0')
+    for item in queryset:
+        total += item.decrypted_amount
+    return total
+
+
+def get_home_charts(user, period='month', currency=None):
     period, start, end, period_label = get_period_range(period)
 
     expenses = user.expenses.filter(
@@ -160,10 +169,15 @@ def get_home_charts(user, period='month'):
         operation_date__gte=start,
         operation_date__lte=end,
     )
+    if currency:
+        expenses = expenses.filter(currency=currency)
+        incomes = incomes.filter(currency=currency)
 
     return {
         'period': period,
         'period_label': period_label,
         'expenses': get_expenses_by_category(expenses),
         'incomes': get_income_by_source(incomes),
+        'expenses_total': get_amount_total(expenses),
+        'incomes_total': get_amount_total(incomes),
     }

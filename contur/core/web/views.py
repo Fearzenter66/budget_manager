@@ -2,11 +2,13 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_POST
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_GET, require_POST
 
 from core.auth_backend import EncryptedUsernameBackend
 from core.expense_stats import PERIOD_CHOICES, get_home_charts, get_period_range
-from core.models import CustomUser, Expense, Income
+from core.models import CURRENCY_CHOICES, CustomUser, Expense, Income
+from core.money import get_display_currency
 from core.web.forms import ExpenseForm, IncomeForm, LoginForm, RegisterForm
 
 
@@ -29,6 +31,7 @@ def _list_period_context(request, queryset):
     records = queryset.filter(
         operation_date__gte=start,
         operation_date__lte=end,
+        currency=get_display_currency(request),
     )
     return {
         'username': request.user.get_decrypted_username(),
@@ -57,7 +60,7 @@ def home(request):
     if period not in dict(PERIOD_CHOICES):
         period = 'month'
 
-    charts = get_home_charts(request.user, period)
+    charts = get_home_charts(request.user, period, currency=get_display_currency(request))
     return render(request, 'home.html', {
         'username': request.user.get_decrypted_username(),
         'period': charts['period'],
@@ -65,6 +68,8 @@ def home(request):
         'period_label': charts['period_label'],
         'expenses_chart': charts['expenses'],
         'incomes_chart': charts['incomes'],
+        'expenses_total': charts['expenses_total'],
+        'incomes_total': charts['incomes_total'],
     })
 
 
@@ -247,6 +252,23 @@ def delete_income_view(request, pk):
     income = get_object_or_404(Income, pk=pk, user=request.user)
     income.delete()
     return _period_redirect(request, 'web:income_list')
+
+
+@login_required
+@require_GET
+def set_balance_currency_view(request):
+    currency = request.GET.get('currency')
+    if currency in dict(CURRENCY_CHOICES):
+        request.session['balance_currency'] = currency
+
+    next_url = request.GET.get('next', '')
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return redirect(next_url)
+    return redirect('web:home')
 
 
 @login_required

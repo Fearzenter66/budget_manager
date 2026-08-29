@@ -1,4 +1,5 @@
 {% extends "base_app.html" %}
+{% load money_tags %}
 
 {% block title %}Доходы — Контур{% endblock %}
 
@@ -44,14 +45,14 @@
                             data-edit-url="{% url 'web:income_list' %}?period={{ period }}&edit={{ income.id }}">
                             <td>{{ income.operation_date|date:"d.m.Y" }}</td>
                             <td>{{ income.decrypted_source }}</td>
-                            <td class="record-amount">{{ income.decrypted_amount|floatformat:2 }} {{ income.currency }}</td>
+                            <td class="record-amount">{{ income.decrypted_amount|format_amount }} {{ income.currency }}</td>
                             <td class="record-note">{{ income.decrypted_note }}</td>
                             <td class="record-actions">
                                 <button type="button"
                                         class="delete-btn"
                                         aria-label="Удалить доход"
                                         data-delete-url="{% url 'web:delete_income' income.id %}"
-                                        data-delete-message="Удалить доход «{{ income.decrypted_source }}» от {{ income.operation_date|date:'d.m.Y' }} на {{ income.decrypted_amount|floatformat:2 }} {{ income.currency }}?">
+                                        data-delete-message="Удалить доход «{{ income.decrypted_source }}» от {{ income.operation_date|date:'d.m.Y' }} на {{ income.decrypted_amount|format_amount }} {{ income.currency }}?">
                                     ×
                                 </button>
                             </td>

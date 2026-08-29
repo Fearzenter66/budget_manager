@@ -1,4 +1,5 @@
 {% extends "base_app.html" %}
+{% load money_tags %}
 
 {% block title %}Расходы — Контур{% endblock %}
 
@@ -51,14 +52,14 @@
                                 </span>
                             </td>
                             <td>{{ expense.subcategory.name }}</td>
-                            <td class="record-amount">{{ expense.decrypted_amount|floatformat:2 }} {{ expense.currency }}</td>
+                            <td class="record-amount">{{ expense.decrypted_amount|format_amount }} {{ expense.currency }}</td>
                             <td class="record-note">{{ expense.decrypted_note }}</td>
                             <td class="record-actions">
                                 <button type="button"
                                         class="delete-btn"
                                         aria-label="Удалить расход"
                                         data-delete-url="{% url 'web:delete_expense' expense.id %}"
-                                        data-delete-message="Удалить расход от {{ expense.operation_date|date:'d.m.Y' }} на {{ expense.decrypted_amount|floatformat:2 }} {{ expense.currency }}?">
+                                        data-delete-message="Удалить расход от {{ expense.operation_date|date:'d.m.Y' }} на {{ expense.decrypted_amount|format_amount }} {{ expense.currency }}?">
                                     ×
                                 </button>
                             </td>

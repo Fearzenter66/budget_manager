@@ -18,6 +18,7 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('register/', views.register_view, name='register'),
     path('settings/', views.settings_view, name='settings'),
+    path('balance-currency/', views.set_balance_currency_view, name='set_balance_currency'),
     path('logout/', views.logout_view, name='logout'),
     path('password-reset/', views.password_reset_view, name='password_reset'),
 ]

@@ -1,8 +1,7 @@
-from datetime import date
-
 from django import forms
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.utils.timezone import localdate
 
 from core.models import CURRENCY_CHOICES, CustomUser, Expense, ExpenseCategory, Income, Subcategory
 
@@ -14,7 +13,7 @@ class TransactionFormMixin:
         super().__init__(*args, **kwargs)
         if instance is None:
             self.fields['currency'].initial = user.currency
-            self.fields['operation_date'].initial = date.today()
+            self.fields['operation_date'].initial = localdate()
 
 
 class ExpenseForm(TransactionFormMixin, forms.Form):

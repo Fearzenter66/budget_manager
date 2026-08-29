@@ -1,4 +1,5 @@
 {% extends "base_app.html" %}
+{% load money_tags %}
 
 {% block title %}Главная — Контур{% endblock %}
 
@@ -29,11 +30,9 @@
     <div class="charts-grid">
         <section class="chart-card">
             <div class="chart-card-header">
-                <div>
-                    <h2 class="chart-title">Расходы по категориям</h2>
-                    <p class="chart-hint">Наведите на категорию, чтобы увидеть подкатегории</p>
-                </div>
-                <a href="{% url 'web:expense_list' %}?period={{ period }}" class="btn btn-secondary btn-sm">Детализация</a>
+                <h2 class="chart-title">Расходы по категориям</h2>
+                <p class="chart-total">{{ expenses_total|format_amount }} {{ balance_currency }}</p>
+                <p class="chart-hint">Наведите на категорию, чтобы увидеть подкатегории</p>
             </div>
             {% if expenses_chart.values %}
                 <div class="chart-area">
@@ -45,14 +44,15 @@
             {% else %}
                 <p class="chart-empty">Нет расходов за выбранный период.</p>
             {% endif %}
+            <div class="chart-footer">
+                <a href="{% url 'web:expense_list' %}?period={{ period }}" class="btn btn-secondary btn-sm">Детализация</a>
+            </div>
         </section>
 
         <section class="chart-card">
             <div class="chart-card-header">
-                <div>
-                    <h2 class="chart-title">Доходы по источникам</h2>
-                </div>
-                <a href="{% url 'web:income_list' %}?period={{ period }}" class="btn btn-secondary btn-sm">Детализация</a>
+                <h2 class="chart-title">Доходы по источникам</h2>
+                <p class="chart-total">{{ incomes_total|format_amount }} {{ balance_currency }}</p>
             </div>
             {% if incomes_chart.values %}
                 <div class="chart-area">
@@ -64,6 +64,9 @@
             {% else %}
                 <p class="chart-empty">Нет доходов за выбранный период.</p>
             {% endif %}
+            <div class="chart-footer">
+                <a href="{% url 'web:income_list' %}?period={{ period }}" class="btn btn-secondary btn-sm">Детализация</a>
+            </div>
         </section>
     </div>
 </div>
@@ -128,16 +131,26 @@
         border: 1px solid var(--border);
         border-radius: 1rem;
         padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
     }
 
-    .chart-card-header .btn {
-        flex-shrink: 0;
+    .chart-card-header {
+        margin-bottom: 1rem;
     }
 
     .chart-title {
         font-size: 1.1rem;
         font-weight: 600;
         margin-bottom: 0.35rem;
+    }
+
+    .chart-total {
+        font-size: 1.35rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        margin-bottom: 0.35rem;
+        white-space: nowrap;
     }
 
     .chart-card-header .chart-hint {
@@ -150,10 +163,17 @@
         margin-bottom: 1rem;
     }
 
+    .chart-footer {
+        display: flex;
+        justify-content: center;
+        margin-top: 1.25rem;
+    }
+
     .chart-area {
         display: flex;
         flex-direction: column;
         align-items: center;
+        flex: 1;
     }
 
     .chart-wrap {
@@ -199,12 +219,30 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
+    function formatAmount(value) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) {
+            return '0.00';
+        }
+        const sign = number < 0 ? '-' : '';
+        const [integer, fraction] = Math.abs(number).toFixed(2).split('.');
+        const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        return `${sign}${grouped}.${fraction}`;
+    }
+
     const pieChartOptions = {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
             legend: {
                 display: false,
+            },
+            tooltip: {
+                callbacks: {
+                    label(context) {
+                        return `${context.label}: ${formatAmount(context.parsed)}`;
+                    },
+                },
             },
         },
     };
@@ -288,6 +326,9 @@
                                     return `${ExpenseCategoryLabel(categoryKey)} · ${items[0].label}`;
                                 }
                                 return items[0].label;
+                            },
+                            label(items) {
+                                return formatAmount(items.parsed);
                             },
                         },
                     },
