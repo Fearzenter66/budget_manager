@@ -5,6 +5,14 @@ from django.utils.timezone import localdate
 
 from core.models import CURRENCY_CHOICES, CustomUser, Expense, ExpenseCategory, Income, Subcategory
 
+DATE_INPUT_FORMATS = ['%d/%m/%Y', '%d.%m.%Y']
+DATE_INPUT_ATTRS = {
+    'class': 'form-input',
+    'placeholder': 'дд/мм/гггг',
+    'autocomplete': 'off',
+    'inputmode': 'numeric',
+}
+
 
 class TransactionFormMixin:
     def __init__(self, user, *args, instance=None, **kwargs):
@@ -35,10 +43,8 @@ class ExpenseForm(TransactionFormMixin, forms.Form):
     )
     operation_date = forms.DateField(
         label='Дата операции',
-        widget=forms.DateInput(format='%Y-%m-%d', attrs={
-            'class': 'form-input',
-            'type': 'date',
-        }),
+        input_formats=DATE_INPUT_FORMATS,
+        widget=forms.DateInput(format='%d/%m/%Y', attrs=DATE_INPUT_ATTRS),
     )
     category = forms.ChoiceField(
         choices=ExpenseCategory.choices,
@@ -154,10 +160,8 @@ class ExpenseForm(TransactionFormMixin, forms.Form):
 class IncomeForm(TransactionFormMixin, forms.Form):
     operation_date = forms.DateField(
         label='Дата',
-        widget=forms.DateInput(format='%Y-%m-%d', attrs={
-            'class': 'form-input',
-            'type': 'date',
-        }),
+        input_formats=DATE_INPUT_FORMATS,
+        widget=forms.DateInput(format='%d/%m/%Y', attrs=DATE_INPUT_ATTRS),
     )
     source = forms.CharField(
         required=False,

@@ -12,12 +12,24 @@
         </div>
         <div class="period-filter">
             {% for value, label in period_choices %}
-                <a href="?period={{ value }}"
+                <a href="?period={{ value }}{% if category %}&category={{ category }}{% endif %}"
                    class="period-btn{% if period == value %} active{% endif %}">
                     {{ label }}
                 </a>
             {% endfor %}
         </div>
+    </div>
+
+    <div class="category-filter">
+        <a href="?period={{ period }}" class="period-btn{% if not category %} active{% endif %}">Все разделы</a>
+        {% for option in category_options %}
+            <a href="?period={{ period }}&category={{ option.value }}"
+               class="period-btn{% if category == option.value %} active{% endif %}"
+               style="--tag-color: {{ option.color }}">
+                <span class="record-dot" style="background: {{ option.color }}"></span>
+                {{ option.label }}
+            </a>
+        {% endfor %}
     </div>
 
     <div class="home-actions">
@@ -43,7 +55,7 @@
                 <tbody>
                     {% for expense in records %}
                         <tr class="record-row"
-                            data-edit-url="{% url 'web:expense_list' %}?period={{ period }}&edit={{ expense.id }}">
+                            data-edit-url="{% url 'web:expense_list' %}?{{ list_query }}&edit={{ expense.id }}">
                             <td>{{ expense.operation_date|date:"d.m.Y" }}</td>
                             <td>
                                 <span class="record-category" style="--dot-color: {{ expense.subcategory.category_color }}">
@@ -68,7 +80,13 @@
                 </tbody>
             </table>
         {% else %}
-            <p class="records-empty">Нет расходов за выбранный период.</p>
+            <p class="records-empty">
+                {% if category %}
+                    Нет расходов в разделе «{{ category_label }}» за выбранный период.
+                {% else %}
+                    Нет расходов за выбранный период.
+                {% endif %}
+            </p>
         {% endif %}
     </div>
 </div>
@@ -80,6 +98,7 @@
         <form method="post" id="delete-form">
             {% csrf_token %}
             <input type="hidden" name="period" value="{{ period }}">
+            {% if category %}<input type="hidden" name="category" value="{{ category }}">{% endif %}
             <div class="form-actions">
                 <button type="submit" class="btn btn-danger">Удалить</button>
                 <button type="button" class="btn btn-secondary" id="delete-cancel">Отмена</button>
@@ -89,17 +108,18 @@
 </div>
 
 {% if edit_form %}
-<div class="modal-overlay is-open" id="edit-modal" data-close-url="{% url 'web:expense_list' %}?period={{ period }}">
+<div class="modal-overlay is-open" id="edit-modal" data-close-url="{% url 'web:expense_list' %}?{{ list_query }}">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-title">
         <h2 class="modal-title" id="edit-title">Редактировать расход</h2>
         <p class="modal-text">Измените данные и сохраните запись.</p>
         <form method="post" class="form" id="expense-form" action="{% url 'web:edit_expense' editing_id %}">
             {% csrf_token %}
             <input type="hidden" name="period" value="{{ period }}">
+            {% if category %}<input type="hidden" name="category" value="{{ category }}">{% endif %}
             {% include "includes/expense_form_fields.html" with form=edit_form %}
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Сохранить</button>
-                <a href="{% url 'web:expense_list' %}?period={{ period }}" class="btn btn-secondary" id="edit-cancel">Отмена</a>
+                <a href="{% url 'web:expense_list' %}?{{ list_query }}" class="btn btn-secondary" id="edit-cancel">Отмена</a>
             </div>
         </form>
     </div>
@@ -145,11 +165,25 @@
         color: var(--text-muted);
         font-size: 0.95rem;
     }
+
+    .category-filter {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+
+    .category-filter .period-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
 </style>
 {% endblock %}
 
 {% block extra_js %}
 {% include "includes/detail_modals_script.html" %}
+{% include "includes/date_input_script.html" %}
 {% if edit_form %}
     {% include "includes/expense_picker_script.html" %}
 {% endif %}

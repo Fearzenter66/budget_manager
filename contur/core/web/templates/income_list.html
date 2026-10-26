@@ -42,7 +42,7 @@
                 <tbody>
                     {% for income in records %}
                         <tr class="record-row"
-                            data-edit-url="{% url 'web:income_list' %}?period={{ period }}&edit={{ income.id }}">
+                            data-edit-url="{% url 'web:income_list' %}?{{ list_query }}&edit={{ income.id }}">
                             <td>{{ income.operation_date|date:"d.m.Y" }}</td>
                             <td>{{ income.decrypted_source }}</td>
                             <td class="record-amount">{{ income.decrypted_amount|format_amount }} {{ income.currency }}</td>
@@ -82,7 +82,7 @@
 </div>
 
 {% if edit_form %}
-<div class="modal-overlay is-open" id="edit-modal" data-close-url="{% url 'web:income_list' %}?period={{ period }}">
+<div class="modal-overlay is-open" id="edit-modal" data-close-url="{% url 'web:income_list' %}?{{ list_query }}">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-title">
         <h2 class="modal-title" id="edit-title">Редактировать доход</h2>
         <p class="modal-text">Измените данные и сохраните запись.</p>
@@ -92,7 +92,7 @@
             {% include "includes/income_form_fields.html" with form=edit_form %}
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Сохранить</button>
-                <a href="{% url 'web:income_list' %}?period={{ period }}" class="btn btn-secondary" id="edit-cancel">Отмена</a>
+                <a href="{% url 'web:income_list' %}?{{ list_query }}" class="btn btn-secondary" id="edit-cancel">Отмена</a>
             </div>
         </form>
     </div>
@@ -142,6 +142,7 @@
 
 {% block extra_js %}
 {% include "includes/detail_modals_script.html" %}
+{% include "includes/date_input_script.html" %}
 {% if edit_form %}
     {% include "includes/income_picker_script.html" %}
 {% endif %}

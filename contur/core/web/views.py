@@ -1,3 +1,5 @@
+from urllib.parse import urlencode
+
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
@@ -7,7 +9,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from core.auth_backend import EncryptedUsernameBackend
 from core.expense_stats import PERIOD_CHOICES, get_home_charts, get_period_range
-from core.models import CURRENCY_CHOICES, CustomUser, Expense, Income
+from core.models import CURRENCY_CHOICES, CustomUser, Expense, ExpenseCategory, Income, Subcategory
 from core.money import get_display_currency
 from core.web.forms import ExpenseForm, IncomeForm, LoginForm, RegisterForm
 
@@ -19,10 +21,27 @@ def _get_period(request):
     return period
 
 
+def _get_category(request):
+    category = request.GET.get('category') or request.POST.get('category', '')
+    if category in ExpenseCategory.values:
+        return category
+    return ''
+
+
+def _build_list_query(request, **extra):
+    params = {'period': _get_period(request)}
+    category = _get_category(request)
+    if category:
+        params['category'] = category
+    for key, value in extra.items():
+        if value not in (None, ''):
+            params[key] = value
+    return urlencode(params)
+
+
 def _period_redirect(request, view_name, **kwargs):
     url = reverse(view_name, kwargs=kwargs)
-    period = _get_period(request)
-    return redirect(f'{url}?period={period}')
+    return redirect(f'{url}?{_build_list_query(request)}')
 
 
 def _list_period_context(request, queryset):
@@ -38,6 +57,7 @@ def _list_period_context(request, queryset):
         'period': period,
         'period_choices': PERIOD_CHOICES,
         'period_label': period_label,
+        'list_query': _build_list_query(request),
         'records': records,
     }
 
@@ -150,9 +170,29 @@ def add_income_view(request):
 
 def _expense_list_context(request, edit_form=None, editing_id=None):
     context = _list_period_context(request, request.user.expenses.select_related('subcategory'))
+    category = _get_category(request)
+    records = context['records']
+    if category:
+        subcategory_ids = [
+            subcategory.id
+            for subcategory in Subcategory.objects.filter(user=request.user)
+            if subcategory.decrypted_category == category
+        ]
+        records = records.filter(subcategory_id__in=subcategory_ids)
     context.update({
         'edit_form': edit_form,
         'editing_id': editing_id,
+        'category': category,
+        'category_label': dict(ExpenseCategory.choices).get(category, ''),
+        'category_options': [
+            {
+                'value': choice.value,
+                'label': choice.label,
+                'color': ExpenseCategory.get_color(choice.value),
+            }
+            for choice in ExpenseCategory
+        ],
+        'records': records,
     })
     return context
 
@@ -205,7 +245,7 @@ def edit_expense_view(request, pk):
     expense = get_object_or_404(Expense, pk=pk, user=request.user)
     if request.method != 'POST':
         url = reverse('web:expense_list')
-        return redirect(f'{url}?period={_get_period(request)}&edit={pk}')
+        return redirect(f'{url}?{_build_list_query(request, edit=pk)}')
 
     form = ExpenseForm(request.user, request.POST, instance=expense)
     if form.is_valid():
@@ -224,7 +264,7 @@ def edit_income_view(request, pk):
     income = get_object_or_404(Income, pk=pk, user=request.user)
     if request.method != 'POST':
         url = reverse('web:income_list')
-        return redirect(f'{url}?period={_get_period(request)}&edit={pk}')
+        return redirect(f'{url}?{_build_list_query(request, edit=pk)}')
 
     form = IncomeForm(request.user, request.POST, instance=income)
     if form.is_valid():

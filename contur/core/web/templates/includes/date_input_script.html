@@ -1,0 +1,18 @@
+<script>
+    (function () {
+        document.querySelectorAll('input[name="operation_date"]').forEach((input) => {
+            input.addEventListener('input', () => {
+                const digits = input.value.replace(/\D/g, '').slice(0, 8);
+                if (digits.length > 4) {
+                    input.value = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+                    return;
+                }
+                if (digits.length > 2) {
+                    input.value = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+                    return;
+                }
+                input.value = digits;
+            });
+        });
+    })();
+</script>
