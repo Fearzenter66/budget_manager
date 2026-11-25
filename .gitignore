@@ -11,6 +11,9 @@ venv/
 # Environment variables
 .env
 
+# Docker / Django collectstatic
+staticfiles/
+
 logs
 alembic
 .vscode

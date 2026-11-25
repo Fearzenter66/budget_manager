@@ -3,9 +3,11 @@ cffi
 cryptography
 Django
 djangorestframework
+gunicorn
 psycopg
 psycopg-binary
 pycparser
 python-dotenv
 sqlparse
 tzdata
+whitenoise
