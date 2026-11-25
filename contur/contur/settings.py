@@ -23,6 +23,24 @@ load_dotenv(BASE_DIR.parent / '.env')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
+def _env(name, default=None):
+    value = os.environ.get(name, default)
+    if isinstance(value, str):
+        return value.strip().strip("'\"")
+    return value
+
+
+def _in_docker():
+    return Path('/.dockerenv').exists()
+
+
+def _db_host():
+    host = _env('DB_HOST', 'localhost')
+    if _in_docker() and host in {'localhost', '127.0.0.1'}:
+        return 'db'
+    return host
+
+
 def _env_bool(name, default=False):
     value = os.environ.get(name)
     if value is None:
@@ -75,6 +93,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'contur.health.HealthCheckMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -112,12 +131,16 @@ WSGI_APPLICATION = 'contur.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': os.environ['DB_ENGINE'].strip("'\""),
-        'NAME': os.environ['DB_NAME'],
-        'USER': os.environ['DB_USER'],
-        'PASSWORD': os.environ['DB_PASSWORD'],
-        'HOST': os.environ['DB_HOST'],
-        'PORT': os.environ['DB_PORT'],
+        'ENGINE': _env('DB_ENGINE', 'django.db.backends.postgresql'),
+        'NAME': _env('DB_NAME'),
+        'USER': _env('DB_USER'),
+        'PASSWORD': _env('DB_PASSWORD'),
+        'HOST': _db_host(),
+        'PORT': _env('DB_PORT', '5432'),
+        'CONN_MAX_AGE': 60,
+        'OPTIONS': {
+            'connect_timeout': 5,
+        },
     }
 }
 

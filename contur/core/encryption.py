@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(BASE_DIR, '.env'))
-DATA_KEY = os.getenv('DATA_KEY')
+DATA_KEY = (os.getenv('DATA_KEY') or '').strip() or None
 
 if DATA_KEY is None:
     raise ImproperlyConfigured('Encryption key not found.')
